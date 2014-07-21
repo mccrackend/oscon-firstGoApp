@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
+	rss "github.com/jteeuwen/go-pkg-rss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,6 +48,28 @@ func Fetcher() {
 	}
 }
 
-func PollFeed(string feed) {
+func PollFeed(uri string) {
+	timeout := viper.GetInt("RSSTimeout")
+	if timeout < 1 {
+		timeout = 1
+	}
+	feed := rss.New(timeout, true, chanHandler, itemHandler)
 
+	for {
+		if err := feed.Fetch(uri, nil); err != nil {
+			fmt.Fprintf(os.Stderr, "[e] %s: %s", uri, err)
+			return
+		}
+
+		fmt.Printf("Sleeping for %d seconds on %s\n", feed.SecondsTillUpdate(), uri)
+		time.Sleep(time.Duration(feed.SecondsTillUpdate() * 1e9))
+	}
+}
+
+func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
+	fmt.Printf("%d new channel(s) in %s\n", len(newchannels), feed.Url)
+}
+
+func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
+	fmt.Printf("%d new item(s) in %s\n", len(newitems), feed.Url)
 }
